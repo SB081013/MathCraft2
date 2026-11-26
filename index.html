@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MathCraft" />
+  <meta name="theme-color" content="#151922" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
+  <title>MathCraft: ACT Quest</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Main 3D WebGL Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Crosshair -->
+  <div id="crosshair" class="hidden">
+    <div class="ch-h"></div>
+    <div class="ch-v"></div>
+  </div>
+
+  <!-- Target Block Info Banner -->
+  <div id="targetInfo" class="hidden">
+    <span id="targetName">Grass Block</span>
+    <span id="targetHint">Left-click to mine • Right-click to place</span>
+  </div>
+
+  <!-- Top HUD Bar -->
+  <div id="hudTop" class="hidden">
+    <div class="hud-card hud-player">
+      <div class="hud-title-row">
+        <span class="badge-lvl" id="hudLevel">LVL 1</span>
+        <span class="hud-pickaxe" id="hudPickaxe">Wooden Pickaxe (Tier 1)</span>
+      </div>
+      <div class="xp-bar-wrap">
+        <div class="xp-bar-fill" id="hudXpBar" style="width: 0%"></div>
+        <span class="xp-bar-text" id="hudXpText">0 / 100 XP</span>
+      </div>
+    </div>
+
+    <div class="hud-card hud-act">
+      <div class="act-score-box">
+        <span class="act-label">EST. ACT MATH</span>
+        <span class="act-value" id="hudActScore">14</span>
+        <span class="act-max">/ 36</span>
+      </div>
+      <div class="hud-stats-mini">
+        <span title="Current Answer Streak">🔥 <strong id="hudStreak">0</strong></span>
+        <span title="Math Gems (Currency)">💎 <strong id="hudGems">0</strong></span>
+        <span title="Current Adaptive Tier">⚡ Tier <strong id="hudTier">1</strong></span>
+      </div>
+    </div>
+
+    <div class="hud-card hud-quest">
+      <div class="quest-header">
+        <span class="quest-tag">ACTIVE QUEST</span>
+        <span id="questReward" class="quest-reward">+50 💎</span>
+      </div>
+      <div id="questText" class="quest-text">Mine 3 glowing Math Ore blocks</div>
+      <div class="quest-progress-wrap">
+        <div id="questBar" class="quest-progress-fill" style="width: 0%"></div>
+        <span id="questCount" class="quest-count">0 / 3</span>
+      </div>
+    </div>
+
+    <div class="hud-actions">
+      <button class="mc-btn small" id="btnCraft" title="Open Crafting & Upgrades (C)">⚒️ Craft [C]</button>
+      <button class="mc-btn small accent" id="btnJournal" title="ACT Mastery & Stuck-Point Tutor (M)">📘 ACT Tutor [M]</button>
+      <button class="mc-btn small gold-btn" id="btnExam" title="Take 12-Question Timed Mini-ACT Exam (T)">⏱️ Mini-ACT [T]</button>
+      <button class="mc-btn small" id="btnTouchMode" title="Toggle iPhone / Touch Controls">📱</button>
+      <button class="mc-btn small" id="btnSound" title="Toggle Sound">🔊</button>
+      <button class="mc-btn small" id="btnHelp" title="Controls & Pause (Esc)">☰</button>
+    </div>
+  </div>
+
+  <!-- Floating 3D-Projected Mob Name & HP Labels -->
+  <div id="mobLabelsLayer"></div>
+
+  <!-- Boss HP Bar (visible when near the ACT Math Titan) -->
+  <div id="bossBarWrap" class="hidden">
+    <div class="boss-bar-title">
+      <span>👑 ACT MATH TITAN — GRAND BOSS</span>
+      <span id="bossHpText">5 / 5 HP</span>
+    </div>
+    <div class="boss-bar-track">
+      <div id="bossBarFill" class="boss-bar-fill" style="width: 100%"></div>
+    </div>
+  </div>
+
+  <!-- Active Tutor Alert Pill (appears when a gap is detected) -->
+  <div id="gapAlert" class="hidden">
+    <span class="gap-dot"></span>
+    <span id="gapAlertText">Gap spotted: Slope Formula</span>
+    <button class="mc-btn tiny accent" id="btnOpenGapLesson">Learn Basics →</button>
+  </div>
+
+  <!-- Toast / Reward Popups -->
+  <div id="toastContainer"></div>
+
+  <!-- Handheld Pickaxe / Block Viewmodel Overlay (2D Canvas) -->
+  <canvas id="handCanvas" width="260" height="260" class="hidden"></canvas>
+
+  <!-- iPhone / Mobile Touch Controls Overlay -->
+  <div id="touchControls" class="hidden">
+    <div id="joyBase" class="joy-base" aria-label="Movement Joystick">
+      <div id="joyKnob" class="joy-knob"></div>
+    </div>
+    <div class="touch-actions">
+      <button id="btnTouchMine" class="touch-btn mine" type="button">⛏️<span>MINE</span></button>
+      <button id="btnTouchPlace" class="touch-btn place" type="button">🧱<span>PLACE</span></button>
+      <button id="btnTouchJump" class="touch-btn jump" type="button">⬆️<span>JUMP</span></button>
+    </div>
+  </div>
+
+  <!-- Bottom Hotbar -->
+  <div id="hotbarWrap" class="hidden">
+    <div id="activeBuffs"></div>
+    <div id="hotbar"></div>
+    <div class="controls-strip">
+      <span><b>WASD</b> Move</span>
+      <span><b>Space</b> Jump</span>
+      <span><b>L-Click</b> Mine / Solve</span>
+      <span><b>R-Click / F</b> Place Block</span>
+      <span><b>1-9 / Scroll</b> Hotbar</span>
+      <span><b>C</b> Craft</span>
+      <span><b>M</b> ACT Mastery</span>
+    </div>
+  </div>
+
+  <!-- ==================== TITLE / START OVERLAY ==================== -->
+  <div id="titleOverlay" class="modal-backdrop">
+    <div class="title-panel mc-panel">
+      <div class="title-logo">
+        <div class="cube-icon"></div>
+        <div>
+          <h1>MATHCRAFT</h1>
+          <div class="subtitle">ACT MATH QUEST • ADAPTIVE 3D VOXEL ADVENTURE</div>
+        </div>
+      </div>
+
+      <p class="title-desc">
+        Explore a 3D blocky world, mine glowing <b>Math Ores</b>, unlock <b>Ancient Treasure Chests</b>, and conquer <b>ACT Shrines</b>.
+        Problems start easy and automatically adapt to your skill level—detecting exact concepts you get stuck on and walking you through the basics step by step so you can ace the ACT Math section.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feat-item">
+          <div class="feat-icon">⛏️</div>
+          <div>
+            <strong>Mine &amp; Build</strong>
+            <p>Break blocks, build structures, craft stronger pickaxes &amp; speed/jump upgrades.</p>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">📈</div>
+          <div>
+            <strong>Adaptive Difficulty</strong>
+            <p>Starts easy (Tier 1) and scales up to ACT 32–36 challenges—or eases back when needed.</p>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">🧠</div>
+          <div>
+            <strong>Smart Gap Detector</strong>
+            <p>Identifies specific mistakes &amp; teaches the basics with interactive step-by-step lessons.</p>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">🏆</div>
+          <div>
+            <strong>All ACT Topics + Timed Exam</strong>
+            <p>Pre-Algebra through Logs, Matrices, Conics, Complex Numbers, Boss Battles &amp; a 12-Min Mini-ACT.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="title-buttons">
+        <button class="mc-btn primary large" id="btnPlay">▶ Enter World</button>
+        <button class="mc-btn large" id="btnQuickPractice">📘 Open ACT Skill Diagnostic</button>
+        <button class="mc-btn danger" id="btnResetSave" style="display:none">↻ Reset Progress</button>
+      </div>
+
+      <div class="controls-note">
+        <b>Tip:</b> Click inside the 3D world to look around with your mouse (press <b>Esc</b> to unlock cursor), or hold &amp; drag if mouse lock isn't active.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MATH CHALLENGE MODAL ==================== -->
+  <div id="mathModal" class="modal-backdrop hidden">
+    <div class="mc-panel math-panel">
+      <div class="math-header">
+        <div class="math-header-left">
+          <span class="ore-pill" id="mathSourceTag">💎 Emerald Math Ore</span>
+          <span class="domain-pill" id="mathDomainTag">Elementary Algebra</span>
+          <span class="tier-pill" id="mathTierTag">Tier 1 • Easy</span>
+        </div>
+        <div class="math-header-right">
+          <span class="timer-pill" id="mathTimer">⏱ 0:00</span>
+          <span class="reward-pill" id="mathRewardPreview">+25 💎 • +30 XP</span>
+        </div>
+      </div>
+
+      <!-- Sprint progress bar (only for Shrine 3-question sprints) -->
+      <div id="sprintBanner" class="sprint-banner hidden">
+        <span>⚡ ACT SHRINE SPRINT</span>
+        <span id="sprintStepText">Question 1 of 3</span>
+      </div>
+
+      <!-- Question Body -->
+      <div class="question-box">
+        <div id="questionPrompt" class="question-prompt">Solve for x: 2x + 4 = 12</div>
+        <div id="questionDiagram" class="question-diagram hidden"></div>
+      </div>
+
+      <!-- Hint Box (collapsible / progressive) -->
+      <div id="hintBox" class="hint-box hidden">
+        <div class="hint-title">💡 Step Hint</div>
+        <div id="hintContent"></div>
+      </div>
+
+      <!-- Multiple Choice Options -->
+      <div id="choicesGrid" class="choices-grid"></div>
+
+      <!-- Feedback + Diagnostic Box -->
+      <div id="feedbackBox" class="feedback-box hidden">
+        <div class="feedback-header">
+          <span id="feedbackIcon">✅</span>
+          <strong id="feedbackTitle">Correct!</strong>
+        </div>
+        <div id="feedbackBody" class="feedback-body"></div>
+        <div id="feedbackDiagnosis" class="feedback-diagnosis hidden"></div>
+        <div id="feedbackSteps" class="feedback-steps hidden"></div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="math-footer">
+        <div class="math-footer-left">
+          <button class="mc-btn" id="btnShowHint">💡 Hint (No Penalty)</button>
+          <button class="mc-btn accent" id="btnTeachBasics">📖 Teach Me the Basics</button>
+        </div>
+        <div class="math-footer-right">
+          <button class="mc-btn" id="btnCloseMath">Close</button>
+          <button class="mc-btn primary hidden" id="btnMathContinue">Collect Rewards &amp; Continue →</button>
+          <button class="mc-btn accent hidden" id="btnTryGuided">🛠️ Fix This Skill Now (+Bonus 💎)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== INTERACTIVE LESSON / BASICS TUTOR MODAL ==================== -->
+  <div id="lessonModal" class="modal-backdrop hidden">
+    <div class="mc-panel lesson-panel">
+      <div class="modal-top-bar">
+        <div>
+          <span class="domain-pill" id="lessonDomainTag">Skill Bootcamp</span>
+          <h2 id="lessonTitle">Mastering Linear Equations</h2>
+        </div>
+        <button class="mc-btn small" id="btnCloseLesson">✕</button>
+      </div>
+
+      <div class="lesson-body">
+        <div class="lesson-card core-rule">
+          <div class="lesson-card-label">1. THE BASICS (WHAT YOU NEED TO KNOW)</div>
+          <div id="lessonConcept" class="lesson-concept"></div>
+          <div id="lessonFormula" class="lesson-formula"></div>
+        </div>
+
+        <div class="lesson-card act-tip">
+          <div class="lesson-card-label">⚡ ACT TEST SHORTCUT / WATCH-OUT</div>
+          <div id="lessonActTip"></div>
+        </div>
+
+        <div class="lesson-card walkthrough">
+          <div class="lesson-card-label">2. STEP-BY-STEP WORKED EXAMPLE</div>
+          <div id="lessonExampleProblem" class="lesson-example-problem"></div>
+          <div id="lessonStepsList" class="lesson-steps-list"></div>
+          <button class="mc-btn small" id="btnNextStep">Reveal Next Step →</button>
+        </div>
+
+        <div class="lesson-card quick-check">
+          <div class="lesson-card-label">3. QUICK FOUNDATION CHECK (EARN +15 💎 LEARNING BONUS)</div>
+          <div id="checkPrompt" class="check-prompt"></div>
+          <div id="checkChoices" class="check-choices"></div>
+          <div id="checkResult" class="check-result hidden"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="mc-btn primary" id="btnLessonPracticeMore">⛏️ Practice This Topic Now</button>
+        <button class="mc-btn" id="btnLessonDone">Back to World</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CRAFTING & UPGRADES MODAL ==================== -->
+  <div id="craftModal" class="modal-backdrop hidden">
+    <div class="mc-panel wide-panel">
+      <div class="modal-top-bar">
+        <div>
+          <h2>⚒️ Crafting &amp; Progression Bench</h2>
+          <p class="modal-sub">Spend Math Gems 💎 and mined ores to upgrade your pickaxe, unlock deeper ores, and get building blocks &amp; perks.</p>
+        </div>
+        <div class="wallet-badges">
+          <span>💎 <strong id="craftGems">0</strong> Gems</span>
+          <span>🪵 <strong id="craftWood">0</strong> Wood</span>
+          <span>🪨 <strong id="craftStone">0</strong> Stone</span>
+          <span>🔩 <strong id="craftIron">0</strong> Iron</span>
+          <span>🥇 <strong id="craftGold">0</strong> Gold</span>
+          <span>💠 <strong id="craftDiamond">0</strong> Diamond</span>
+          <button class="mc-btn small" id="btnCloseCraft">✕</button>
+        </div>
+      </div>
+
+      <div class="craft-tabs">
+        <button class="craft-tab active" data-tab="pickaxes">⛏️ Pickaxe Tiers</button>
+        <button class="craft-tab" data-tab="perks">✨ World Perks &amp; Gear</button>
+        <button class="craft-tab" data-tab="blocks">🧱 Building Blocks</button>
+      </div>
+
+      <div id="craftList" class="craft-grid"></div>
+    </div>
+  </div>
+
+  <!-- ==================== ACT MASTERY & GAP JOURNAL MODAL ==================== -->
+  <div id="journalModal" class="modal-backdrop hidden">
+    <div class="mc-panel wide-panel">
+      <div class="modal-top-bar">
+        <div>
+          <h2>📘 ACT Math Mastery &amp; Diagnostic Radar</h2>
+          <p class="modal-sub">Tracks your estimated ACT score, adapts your difficulty per topic, and pinpoints exact skills you need to review.</p>
+        </div>
+        <button class="mc-btn small" id="btnCloseJournal">✕</button>
+      </div>
+
+      <div class="journal-summary">
+        <div class="j-stat highlight">
+          <div class="j-label">Estimated ACT Math</div>
+          <div class="j-big" id="jActScore">14 / 36</div>
+          <div class="j-sub" id="jActRank">Apprentice Explorer</div>
+        </div>
+        <div class="j-stat">
+          <div class="j-label">Accuracy</div>
+          <div class="j-big" id="jAccuracy">—</div>
+          <div class="j-sub" id="jTotalSolved">0 solved</div>
+        </div>
+        <div class="j-stat">
+          <div class="j-label">Avg Pace (ACT Target: 60s)</div>
+          <div class="j-big" id="jPace">—</div>
+          <div class="j-sub" id="jPaceStatus">Warming up</div>
+        </div>
+        <div class="j-stat">
+          <div class="j-label">Best Streak</div>
+          <div class="j-big" id="jBestStreak">0 🔥</div>
+          <div class="j-sub">Combo Bonus Active</div>
+        </div>
+      </div>
+
+      <div class="journal-columns">
+        <div class="journal-col">
+          <h3>🎯 Detected Weak Spots &amp; Stuck Points</h3>
+          <p class="small-muted">When you miss a question, MathCraft diagnoses the exact concept behind the mistake and lists it here.</p>
+          <div id="gapsList" class="gaps-list"></div>
+
+          <h3 style="margin-top:16px">🚀 Advanced ACT Topics (30–36 Scorers)</h3>
+          <p class="small-muted">Jump straight into high-yield ACT upper-tier topics with guided lessons &amp; drills.</p>
+          <div id="advancedTopicsList" class="adv-topics-grid"></div>
+        </div>
+
+        <div class="journal-col">
+          <h3>📊 ACT Math 6-Domain Mastery</h3>
+          <p class="small-muted">Click any topic to launch a targeted practice drill or view its basics lesson.</p>
+          <div id="domainsList" class="domains-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TIMED 12-QUESTION MINI-ACT EXAM MODAL ==================== -->
+  <div id="examModal" class="modal-backdrop hidden">
+    <div class="mc-panel wide-panel exam-panel">
+      <div class="modal-top-bar">
+        <div>
+          <span class="domain-pill">OFFICIAL-STYLE PRACTICE TEST</span>
+          <h2>⏱️ Timed Mini-ACT Math Exam (12 Questions • 12 Minutes)</h2>
+          <p class="modal-sub">Exact ACT pacing (1 min/question) spanning all 6 domains from Easy to Advanced—earn huge Treasure rewards &amp; a full diagnostic Score Report!</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="examCountdown" class="exam-clock">⏱ 12:00</span>
+          <button class="mc-btn small" id="btnCloseExam">✕</button>
+        </div>
+      </div>
+
+      <!-- Exam Intro Screen -->
+      <div id="examIntroView">
+        <div class="exam-rules-grid">
+          <div class="j-stat">
+            <div class="j-label">Format</div>
+            <div class="j-big">12 Questions</div>
+            <div class="j-sub">2 per ACT Domain • Easy → ACT 36</div>
+          </div>
+          <div class="j-stat">
+            <div class="j-label">Time Limit</div>
+            <div class="j-big">12:00</div>
+            <div class="j-sub">Real ACT pace: 60s / question</div>
+          </div>
+          <div class="j-stat">
+            <div class="j-label">Reward Vault</div>
+            <div class="j-big">Up to 400 💎</div>
+            <div class="j-sub">+ Diamonds, Gold &amp; Score Report</div>
+          </div>
+        </div>
+        <p class="modal-sub" style="margin-bottom:16px">
+          Just like test day, hints are hidden until you submit—you can jump freely between Q1–Q12 before submitting. Afterward, MathCraft grades your scaled ACT score (12–36) and pinpoints every weak spot with 1-click Basics Lessons.
+        </p>
+        <div style="display:flex;gap:10px">
+          <button class="mc-btn primary large" id="btnStartExamNow">▶ Start Timed Mini-ACT Exam</button>
+          <button class="mc-btn large" id="btnCancelExamIntro">Not Yet</button>
+        </div>
+      </div>
+
+      <!-- Active Exam View -->
+      <div id="examActiveView" class="hidden">
+        <div id="examNavPills" class="exam-nav-pills"></div>
+        <div class="math-header" style="margin-top:8px">
+          <div class="math-header-left">
+            <span class="ore-pill" id="examQNum">Question 1 of 12</span>
+            <span class="domain-pill" id="examQDomain">Pre-Algebra</span>
+            <span class="tier-pill" id="examQTier">Tier 1</span>
+          </div>
+          <div class="math-header-right">
+            <span class="timer-pill" id="examAnsweredCount">0 / 12 Answered</span>
+          </div>
+        </div>
+
+        <div class="question-box">
+          <div id="examQPrompt" class="question-prompt"></div>
+          <div id="examQDiagram" class="question-diagram hidden"></div>
+        </div>
+
+        <div id="examChoicesGrid" class="choices-grid"></div>
+
+        <div class="math-footer">
+          <div class="math-footer-left">
+            <button class="mc-btn" id="btnExamPrev">← Previous</button>
+            <button class="mc-btn" id="btnExamNext">Next →</button>
+          </div>
+          <div class="math-footer-right">
+            <button class="mc-btn primary" id="btnSubmitExam">✓ Finish &amp; Grade Exam</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Report View -->
+      <div id="examReportView" class="hidden">
+        <div class="journal-summary">
+          <div class="j-stat highlight">
+            <div class="j-label">Mini-ACT Scaled Score</div>
+            <div class="j-big" id="repScaledScore">26 / 36</div>
+            <div class="j-sub" id="repRank">Gold Strategist</div>
+          </div>
+          <div class="j-stat">
+            <div class="j-label">Raw Score</div>
+            <div class="j-big" id="repRawScore">8 / 12</div>
+            <div class="j-sub" id="repPct">67% Correct</div>
+          </div>
+          <div class="j-stat">
+            <div class="j-label">Time Used</div>
+            <div class="j-big" id="repTime">7:42</div>
+            <div class="j-sub" id="repPace">Avg 38s / question</div>
+          </div>
+          <div class="j-stat">
+            <div class="j-label">Rewards Earned</div>
+            <div class="j-big" id="repGems">+280 💎</div>
+            <div class="j-sub" id="repLoot">+3 Diamonds • +3 Gold</div>
+          </div>
+        </div>
+
+        <h3 style="margin:0 0 8px">📋 Question-by-Question Review &amp; Gap Diagnosis</h3>
+        <div id="examReviewList" class="exam-review-list"></div>
+
+        <div class="modal-footer" style="margin-top:14px">
+          <button class="mc-btn primary" id="btnRetakeExam">↻ Take Another Mini-ACT</button>
+          <button class="mc-btn" id="btnExamFinishClose">Back to World</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts (classic order so index.html works seamlessly over file:// AND http://) -->
+  <script src="js/audio.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/math-engine.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/mobs.js"></script>
+  <script src="js/engine3d.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

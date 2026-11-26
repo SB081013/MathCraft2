@@ -1,0 +1,23 @@
+name: MathCraftIOS
+options:
+  bundleIdPrefix: com.mathcraft
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  MathCraftIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: MathCraftIOS
+      - path: ../../
+        name: WebBundle
+        type: folder
+        excludes:
+          - "ios-app/**"
+          - "*.ps1"
+    settings:
+      base:
+        INFOPLIST_FILE: MathCraftIOS/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.mathcraft.actquest
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"

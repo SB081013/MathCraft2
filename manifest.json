@@ -1,0 +1,30 @@
+{
+  "name": "MathCraft: ACT Quest",
+  "short_name": "MathCraft",
+  "description": "3D Minecraft-style voxel adventure with adaptive ACT Math prep, gap diagnostics, roaming bosses, and timed Mini-ACT exams.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#151922",
+  "icons": [
+    {
+      "src": "icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
