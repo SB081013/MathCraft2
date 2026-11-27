@@ -1,5 +1,6 @@
-// Offline-first Service Worker for iPhone PWA ("Add to Home Screen")
-const CACHE_NAME = 'mathcraft-act-v2';
+// Network-first with offline cache fallback for iPhone PWA ("Add to Home Screen")
+// Ensures updates load immediately when online, while still working 100% offline!
+const CACHE_NAME = 'mathcraft-act-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -34,15 +35,12 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const networkFetch = fetch(event.request).then(resp => {
-        if (resp && resp.status === 200) {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-        }
-        return resp;
-      }).catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(event.request).then(resp => {
+      if (resp && resp.status === 200) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+      }
+      return resp;
+    }).catch(() => caches.match(event.request))
   );
 });
