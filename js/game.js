@@ -174,6 +174,9 @@ window.MathCraft = window.MathCraft || {};
     });
 
     const inWorld = (name === null && gameStarted);
+    if (inWorld && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     Engine.setPaused(!inWorld);
     $('crosshair').classList.toggle('hidden', !inWorld);
     $('handCanvas').classList.toggle('hidden', !inWorld);
@@ -1523,26 +1526,33 @@ window.MathCraft = window.MathCraft || {};
     base.addEventListener('touchstart', e => {
       e.preventDefault();
       e.stopPropagation();
-      const t = e.changedTouches[0];
-      joyTouchId = t.identifier;
-      updateJoy(t.clientX, t.clientY);
-    }, { passive: false });
-
-    base.addEventListener('touchmove', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (t.identifier === joyTouchId) updateJoy(t.clientX, t.clientY);
+      if (joyTouchId === null && e.changedTouches.length > 0) {
+        const t = e.changedTouches[0];
+        joyTouchId = t.identifier;
+        updateJoy(t.clientX, t.clientY);
       }
     }, { passive: false });
 
-    base.addEventListener('touchend', e => {
+    // Track thumb movement on window so sliding past the circle edge stays buttery smooth on iPhone
+    window.addEventListener('touchmove', e => {
+      if (joyTouchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === joyTouchId) {
+          e.preventDefault();
+          updateJoy(t.clientX, t.clientY);
+        }
+      }
+    }, { passive: false });
+
+    const endJoyTouch = e => {
+      if (joyTouchId === null) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === joyTouchId) resetJoy();
       }
-    });
-    base.addEventListener('touchcancel', resetJoy);
+    };
+    window.addEventListener('touchend', endJoyTouch, { passive: true });
+    window.addEventListener('touchcancel', endJoyTouch, { passive: true });
 
     // Mouse fallback for testing joystick on desktop
     base.addEventListener('mousedown', e => {

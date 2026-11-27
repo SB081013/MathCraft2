@@ -358,12 +358,12 @@ window.MathCraft.Engine3D = (function () {
     const r = 0.28;
     const h = 1.72;
     const checks = [
-      [nx - r, ny + 0.05, nz - r], [nx + r, ny + 0.05, nz - r],
-      [nx - r, ny + 0.05, nz + r], [nx + r, ny + 0.05, nz + r],
-      [nx - r, ny + 0.9, nz - r],  [nx + r, ny + 0.9, nz - r],
-      [nx - r, ny + 0.9, nz + r],  [nx + r, ny + 0.9, nz + r],
-      [nx - r, ny + h, nz - r],    [nx + r, ny + h, nz - r],
-      [nx - r, ny + h, nz + r],    [nx + r, ny + h, nz + r]
+      [nx - r, ny + 0.002, nz - r], [nx + r, ny + 0.002, nz - r],
+      [nx - r, ny + 0.002, nz + r], [nx + r, ny + 0.002, nz + r],
+      [nx - r, ny + 0.9, nz - r],   [nx + r, ny + 0.9, nz - r],
+      [nx - r, ny + 0.9, nz + r],   [nx + r, ny + 0.9, nz + r],
+      [nx - r, ny + h, nz - r],     [nx + r, ny + h, nz - r],
+      [nx - r, ny + h, nz + r],     [nx + r, ny + h, nz + r]
     ];
     for (let i = 0; i < checks.length; i++) {
       if (World.isSolid(checks[i][0], checks[i][1], checks[i][2])) return true;
@@ -383,10 +383,10 @@ window.MathCraft.Engine3D = (function () {
 
     const cy = Math.cos(player.yaw), sy = Math.sin(player.yaw);
     let moveX = 0, moveZ = 0;
-    if (keys['KeyW']) { moveX -= sy; moveZ -= cy; }
-    if (keys['KeyS']) { moveX += sy; moveZ += cy; }
-    if (keys['KeyA']) { moveX -= cy; moveZ += sy; }
-    if (keys['KeyD']) { moveX += cy; moveZ -= sy; }
+    if (keys['KeyW'] || keys['w']) { moveX -= sy; moveZ -= cy; }
+    if (keys['KeyS'] || keys['s']) { moveX += sy; moveZ += cy; }
+    if (keys['KeyA'] || keys['a']) { moveX -= cy; moveZ += sy; }
+    if (keys['KeyD'] || keys['d']) { moveX += cy; moveZ -= sy; }
 
     // Combine iPhone / Touch Virtual Joystick input!
     if (Math.abs(touchInput.moveX) > 0.08 || Math.abs(touchInput.moveY) > 0.08) {
@@ -398,8 +398,8 @@ window.MathCraft.Engine3D = (function () {
     }
 
     const len = Math.hypot(moveX, moveZ);
-    const sprint = (keys['ShiftLeft'] || keys['ShiftRight'] || touchInput.sprint) ? 1.48 : 1.0;
-    const speed = 5.4 * sprint * player.speedMult;
+    const sprint = (keys['ShiftLeft'] || keys['ShiftRight'] || keys['shift'] || touchInput.sprint) ? 1.48 : 1.0;
+    const speed = 5.6 * sprint * player.speedMult;
 
     if (len > 0.001) {
       moveX = (moveX / len) * speed;
@@ -407,14 +407,29 @@ window.MathCraft.Engine3D = (function () {
       player.walkBob += dt * (sprint > 1 ? 13 : 9);
     }
 
-    // Horizontal move with smooth X/Z axis slide + gentle 1-block auto-step optional on jump
+    // Horizontal move with smooth X/Z axis slide + gentle auto-jump up 1-block steps
+    let blockedHoriz = false;
     const nx = player.x + moveX * dt;
     if (!collidesAt(nx, player.y, player.z)) {
       player.x = nx;
+    } else if (Math.abs(moveX) > 0.01) {
+      blockedHoriz = true;
     }
     const nz = player.z + moveZ * dt;
     if (!collidesAt(player.x, player.y, nz)) {
       player.z = nz;
+    } else if (Math.abs(moveZ) > 0.01) {
+      blockedHoriz = true;
+    }
+
+    // Minecraft-style auto-hop when walking into a 1-block step with clear headroom
+    if (blockedHoriz && player.onGround && len > 0.001) {
+      const stepX = player.x + (moveX / speed) * 0.45;
+      const stepZ = player.z + (moveZ / speed) * 0.45;
+      if (!collidesAt(stepX, player.y + 1.02, stepZ)) {
+        player.vy = 7.6 * player.jumpMult;
+        player.onGround = false;
+      }
     }
 
     // Clamp inside world bounds
@@ -423,7 +438,7 @@ window.MathCraft.Engine3D = (function () {
 
     // Jump & Gravity
     const inWater = World.getBlock(Math.floor(player.x), Math.floor(player.y + 0.4), Math.floor(player.z)) === B.WATER;
-    if (keys['Space'] || touchInput.jump) {
+    if (keys['Space'] || keys[' '] || touchInput.jump) {
       if (player.onGround) {
         player.vy = 8.4 * player.jumpMult;
         player.onGround = false;
@@ -442,10 +457,16 @@ window.MathCraft.Engine3D = (function () {
       player.onGround = false;
     } else {
       if (player.vy < 0) {
-        player.y = Math.floor(player.y);
+        // Snap cleanly to the TOP surface of the solid block beneath feet!
+        player.y = Math.floor(ny + 0.002) + 1.0;
         player.onGround = true;
       }
       player.vy = 0;
+    }
+
+    // Safety unstuck: if player ever ends up overlapping a solid block at feet, lift cleanly
+    if (collidesAt(player.x, player.y, player.z)) {
+      player.y = Math.floor(player.y) + 1.0;
     }
 
     // Safety floor respawn if ever fell
@@ -726,11 +747,12 @@ window.MathCraft.Engine3D = (function () {
     player.z = 32.5;
     player.y = sy + 1.05;
 
-    // Input listeners
+    // Input listeners (track both e.code and lowercase e.key for universal keyboard support)
     window.addEventListener('keydown', e => {
       keys[e.code] = true;
-      if (e.code === 'Space' && !paused) e.preventDefault();
-      if (e.code === 'KeyF' && !paused && currentTarget && currentTarget.placePos) {
+      if (e.key) keys[e.key.toLowerCase()] = true;
+      if ((e.code === 'Space' || e.code.startsWith('Arrow')) && !paused) e.preventDefault();
+      if (e.code === 'KeyF' && !paused && currentTarget && !currentTarget.isMob && currentTarget.placePos) {
         callbacks.onPlace(currentTarget.placePos);
       }
       if (e.code === 'Escape') {
@@ -739,6 +761,10 @@ window.MathCraft.Engine3D = (function () {
     });
     window.addEventListener('keyup', e => {
       keys[e.code] = false;
+      if (e.key) keys[e.key.toLowerCase()] = false;
+    });
+    window.addEventListener('blur', () => {
+      Object.keys(keys).forEach(k => keys[k] = false);
     });
 
     document.addEventListener('pointerlockchange', () => {
